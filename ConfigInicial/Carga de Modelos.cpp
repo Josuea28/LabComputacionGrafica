@@ -143,19 +143,11 @@ int main( )
 
         // Entre los dos perros
         model = glm::translate(model, glm::vec3(1.5f, -0.15f, 0.0f));
-
-        // Poner al gato de pie y viendo hacia enfrente
+               
         model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-        // Tamaño
         model = glm::scale(model, glm::vec3(0.012f, 0.012f, 0.012f));
 
-        glUniformMatrix4fv(
-            glGetUniformLocation(shader.Program, "model"),
-            1,
-            GL_FALSE,
-            glm::value_ptr(model)
-        );
+        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"),1,GL_FALSE,glm::value_ptr(model));
 
         Cat.Draw(shader);
 
