@@ -1,0 +1,8 @@
+newmtl MoonMaterial
+Ka 1.000 1.000 1.000
+Kd 1.000 1.000 1.000
+Ks 0.500 0.500 0.600
+Ns 40.000
+d 1.0
+illum 2
+map_Kd Moon.jpg
