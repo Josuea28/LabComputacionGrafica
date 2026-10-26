@@ -146,10 +146,7 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);*/
 
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-	const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-
-	GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Practica 10  - Juarez Josue", monitor, nullptr);
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Practica 10 - Juarez Josue", nullptr, nullptr);
 
 	if (nullptr == window)
 	{
