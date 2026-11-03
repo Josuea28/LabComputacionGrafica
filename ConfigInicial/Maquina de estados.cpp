@@ -1,6 +1,6 @@
-// Previo 11
+// Practica 11
 // Juarez Osorio Josue Alexis
-// Fecha de entrega: 27 de octubre de 2026
+// Fecha de entrega: 01 de noviembre de 2026
 // No. cuenta: 320083125
 
 #include <iostream>
@@ -34,13 +34,14 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 void MouseCallback(GLFWwindow* window, double xPos, double yPos);
 void DoMovement();
 void Animation();
+float AnguloPaso(float fase);
 
 // Window dimensions
 const GLuint WIDTH = 1600, HEIGHT = 900;
 int SCREEN_WIDTH, SCREEN_HEIGHT;
 
 // Camera
-Camera  camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera  camera(glm::vec3(0.0f, 0.0f, 6.5f));
 GLfloat lastX = WIDTH / 2.0;
 GLfloat lastY = HEIGHT / 2.0;
 bool keys[1024];
@@ -115,15 +116,53 @@ float RLegs = 0.0f;
 float head = 0.0f;
 float tail = 0.0f;
 glm::vec3 dogPos(0.0f, 0.0f, 0.0f);
-float limitePiso = 2.2f; // Limite en Z antes del borde del piso
 float dogRot = 0.0f;
 bool step = false;
+float fasePasos = 0.30f;
+float longitudPaso = 0.32f;   // Distancia recorrida por cada ciclo
+float amplitudPiernas = 22.0f; // Angulo de las patas
+
+// Maquina de estados de la trayectoria
+// 0: Reposo, 1: Girar cabeza, 2: Girar cuerpo, 3: Caminar, 4: Terminado
+int estadoRuta = 0;
+int destinoRuta = 1;
+float giroCabeza = 0.0f;
+float anguloObjetivoRuta = 0.0f;
+float velocidadCaminar = 0.6f;
+float velocidadGiro = 115.0f;
+float velocidadCabeza = 100.0f;
+
+// Puntos del pizarron
+
+float limitePiso = 2.2f;
+float limiteLateral = 2.2f;
+glm::vec3 puntosRuta[] = {
+	glm::vec3(0.0f, 0.0f, 0.0f),                        // E (inicio)
+	glm::vec3(0.0f, 0.0f, limitePiso),                  // A (frente, centro)
+	glm::vec3(limiteLateral, 0.0f, limitePiso),         // B (esquina frontal derecha)
+	glm::vec3(-limiteLateral, 0.0f, -limitePiso),       // C (esquina posterior izquierda)
+	glm::vec3(limiteLateral, 0.0f, -limitePiso),        // D (esquina posterior derecha)
+	glm::vec3(0.0f, 0.0f, 0.0f)                         // E (centro, final)
+};
 
 
 
 // Deltatime
 GLfloat deltaTime = 0.0f;	// Time between current frame and last frame
 GLfloat lastFrame = 0.0f;  	// Time of last frame
+
+// Movimiento de las patas segun la distancia recorrida
+float AnguloPaso(float fase)
+{
+	if (fase < 0.60f) {     //State 1: La pata se apoya y empuja hacia atras
+		return amplitudPiernas * (-1.0f + 2.0f * fase / 0.60f);
+	}
+	else {                 //State 2: La pata avanza para dar otro paso
+		float t = (fase - 0.60f) / 0.40f;
+		t = t * t * (3.0f - 2.0f * t);
+		return amplitudPiernas * (1.0f - 2.0f * t);
+	}
+}
 
 int main()
 {
@@ -137,7 +176,7 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);*/
 
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Animacion maquina de estados - Juarez Josue", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Practica11 - Juarez Josue", nullptr, nullptr);
 
 	if (nullptr == window)
 	{
@@ -319,6 +358,7 @@ int main()
 		//Head
 		model = modelTemp;
 		model = glm::translate(model, glm::vec3(0.0f, 0.093f, 0.208f));
+		model = glm::rotate(model, glm::radians(giroCabeza), glm::vec3(0.0f, 1.0f, 0.0f)); // Mirar antes de caminar
 		model = glm::rotate(model, glm::radians(head), glm::vec3(0.0f, 0.0f, 1.0f));
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		HeadDog.Draw(lightingShader);
@@ -337,7 +377,7 @@ int main()
 		//Front Right Leg
 		model = modelTemp;
 		model = glm::translate(model, glm::vec3(-0.111f, -0.055f, 0.074f));
-		model = glm::rotate(model, glm::radians(FLegs), glm::vec3(1.0f, 0.0f, 0.0f));
+		model = glm::rotate(model, glm::radians(RLegs), glm::vec3(1.0f, 0.0f, 0.0f));
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		F_RightLeg.Draw(lightingShader);
 		//Back Left Leg
@@ -349,7 +389,7 @@ int main()
 		//Back Right Leg
 		model = modelTemp;
 		model = glm::translate(model, glm::vec3(-0.083f, -0.057f, -0.231f));
-		model = glm::rotate(model, glm::radians(RLegs), glm::vec3(-1.0f, 0.0f, 0.0f));
+		model = glm::rotate(model, glm::radians(FLegs), glm::vec3(-1.0f, 0.0f, 0.0f));
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		B_RightLeg.Draw(lightingShader);
 
@@ -505,10 +545,18 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 		AnimBall = !AnimBall;
 
 	}
-	if (keys[GLFW_KEY_B] && dogPos.z < limitePiso)
+	if (key == GLFW_KEY_B && action == GLFW_PRESS && (estadoRuta == 0 || estadoRuta == 4))
 	{
+		// Inicia en E mirando al frente y camina derecho hasta A
+		dogPos = puntosRuta[0];
+		dogRot = 0.0f;
+		giroCabeza = 0.0f;
+		destinoRuta = 1;
+		estadoRuta = 3; // Primer tramo E -> A sin girar
 		dogAnim = 1;
-
+		step = false;
+		fasePasos = 0.30f;
+		RLegs = FLegs = head = tail = 0.0f;
 	}
 
 }
@@ -526,43 +574,100 @@ void Animation() {
 		//printf("/n%f", rotBall);
 	}
 
+	if (estadoRuta == 1) {     //State 1: Girar la cabeza hacia el siguiente punto
+		float dx = puntosRuta[destinoRuta].x - dogPos.x;
+		float dz = puntosRuta[destinoRuta].z - dogPos.z;
+		anguloObjetivoRuta = glm::degrees(atan2(dx, dz));
 
-	if (dogAnim == 1) {     //Walk Animation
-		if (!step) {        //State 1
-			RLegs += 12.0f * deltaTime;
-			FLegs += 12.0f * deltaTime;
-			head += 12.0f * deltaTime;
-			tail += 12.0f * deltaTime;
+		float diferencia = anguloObjetivoRuta - dogRot;
+		while (diferencia > 180.0f) diferencia -= 360.0f;
+		while (diferencia < -180.0f) diferencia += 360.0f;
 
-			if (RLegs > 15.0f) //Condition
-				step = true;
-		}
-		else {               //State 2
-			RLegs -= 12.0f * deltaTime;
-			FLegs -= 12.0f * deltaTime;
-			head -= 12.0f * deltaTime;
-			tail -= 12.0f * deltaTime;
+		float objetivoCabeza = glm::clamp(diferencia, -40.0f, 40.0f);
+		float pasoCabeza = velocidadCabeza * deltaTime;
 
-			if (RLegs < -15.0f) //Condition
-				step = false;
-		}
-
-		dogPos.z += 0.2f * deltaTime;
-
-		// Detener al perro antes de terminar el piso
-		if (dogPos.z >= limitePiso)
+		if (fabs(objetivoCabeza - giroCabeza) <= pasoCabeza)
 		{
-			dogPos.z = limitePiso;
-			dogAnim = 0;
-			RLegs = 0.0f;
-			FLegs = 0.0f;
-			head = 0.0f;
-			tail = 0.0f;
-			step = false;
+			giroCabeza = objetivoCabeza;
+			estadoRuta = 2;
+		}
+		else if (objetivoCabeza > giroCabeza)
+			giroCabeza += pasoCabeza;
+		else
+			giroCabeza -= pasoCabeza;
+	}
+	else if (estadoRuta == 2) {     //State 2: Girar el cuerpo hacia el mismo punto
+		float diferencia = anguloObjetivoRuta - dogRot;
+		while (diferencia > 180.0f) diferencia -= 360.0f;
+		while (diferencia < -180.0f) diferencia += 360.0f;
+
+		float pasoGiro = velocidadGiro * deltaTime;
+		if (fabs(diferencia) <= pasoGiro)
+		{
+			dogRot = anguloObjetivoRuta;
+			giroCabeza = 0.0f;
+			dogAnim = 1;
+			estadoRuta = 3;
+		}
+		else
+		{
+			if (diferencia > 0.0f) dogRot += pasoGiro;
+			else dogRot -= pasoGiro;
+
+			// La cabeza vuelve al frente conforme gira el cuerpo
+			diferencia = anguloObjetivoRuta - dogRot;
+			while (diferencia > 180.0f) diferencia -= 360.0f;
+			while (diferencia < -180.0f) diferencia += 360.0f;
+			giroCabeza = glm::clamp(diferencia, -40.0f, 40.0f);
 		}
 	}
+	else if (estadoRuta == 3) {     //State 3: Caminar hasta el siguiente punto
+		glm::vec3 direccion = puntosRuta[destinoRuta] - dogPos;
+		float distancia = glm::length(direccion);
+		float avance = velocidadCaminar * deltaTime;
+		float avanceReal = glm::min(avance, distancia);
 
+		if (dogAnim == 1) {     //Walk Animation
+			// Los pasos avanzan conforme a la distancia, no a los FPS
+			fasePasos += avanceReal / longitudPaso;
+			fasePasos -= floor(fasePasos);
 
+			step = (fasePasos >= 0.60f); //State 1: Apoyo / State 2: Recuperacion
+			FLegs = AnguloPaso(fasePasos);
+
+			// El par diagonal opuesto se mueve medio ciclo despues
+			float faseContraria = fasePasos + 0.5f;
+			if (faseContraria >= 1.0f)
+				faseContraria -= 1.0f;
+			RLegs = -AnguloPaso(faseContraria);
+
+			// Movimiento suave de cabeza y cola, sin exagerar
+			head = 6.0f * sin(fasePasos * 6.2831853f * 2.0f);
+			tail = 15.0f * sin(fasePasos * 6.2831853f);
+		}
+
+		if (distancia <= avance)
+		{
+			dogPos = puntosRuta[destinoRuta];
+			dogAnim = 0;
+			RLegs = FLegs = head = tail = 0.0f;
+			step = false;
+			fasePasos = 0.30f;
+
+			if (destinoRuta < 5)
+			{
+				destinoRuta++;
+				estadoRuta = 1; // Mira, gira y camina hacia el siguiente punto
+			}
+			else
+			{
+				estadoRuta = 4; 
+				giroCabeza = 0.0f;
+			}
+		}
+		else
+			dogPos += glm::normalize(direccion) * avance;
+	}
 }
 
 void MouseCallback(GLFWwindow* window, double xPos, double yPos)
@@ -582,3 +687,4 @@ void MouseCallback(GLFWwindow* window, double xPos, double yPos)
 
 	camera.ProcessMouseMovement(xOffset, yOffset);
 }
+
